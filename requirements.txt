@@ -1,0 +1,9 @@
+Flask
+Flask-WTF
+Flask-MySQLdb
+Flask-Limiter
+python-dotenv
+cryptography
+gunicorn
+requests
+datetime
