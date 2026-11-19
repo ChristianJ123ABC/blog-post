@@ -15,6 +15,20 @@
     # CSP Headers: https://community.owasp.org/controls/Content_Security_Policy
     #https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers#security
 
+#Required decorator pattern for login + admin
+    #https://flask.palletsprojects.com/en/stable/patterns/viewdecorators/
+
+#Input validation
+    #OWASP REGEX: https://community.owasp.org/OWASP_Validation_Regex_Repository
+    #https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
+    #Regex Tester: https://regex101.com/
+    #Exception handling: https://werkzeug.palletsprojects.com/en/stable/exceptions/
+
+    #Passwords
+        #NIST SP800-63B-4: https://pages.nist.gov/800-63-4/sp800-63b.html
+        #100,000 commonly breached passwords: https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt
+
+
 
 import re, os, logging, werkzeug
 from functools import wraps
@@ -90,3 +104,105 @@ def add_headers(response):
 @app.route("/")
 def home():
     return render_template("landing_page.html")
+
+
+
+
+# - - - - - - -
+# FUNCTIONS FOR FEATURES (ORDER: Logging, Access Control, Validation, Exception Handling)
+# - - - - - - -
+
+#Types of actions logged as WARNING
+warningActions = ["failed_login", "forbidden", "failed_account_delete"]
+
+def writeLog(action, userId=None):
+    cursor = mysql.connection.cursor()
+    cursor.execute("INSERT INTO logs (user_id, action, ip_address) VALUES (%s, %s, %s)", (userId, action, get_remote_address()))
+    mysql.connection.commit()
+    cursor.close()
+    level = logging.WARNING if action in warningActions else logging.INFO
+    securityLogger.log(level, "action=%s user_id=%s ip=%s", action, userId, get_remote_address())
+
+
+#Decorator Patterns:  checks if the user is logged in or if an admin is required. these are re-used with every route that needs it.
+def loginRequired(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            flash("You need to be logged in.", "warning")
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+def isAdmin():
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT role FROM users WHERE id = %s", (session["user_id"],))
+    user = cursor.fetchone()
+    cursor.close()
+    return user is not None and user["role"] == "admin"
+
+
+def adminRequired(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        if not isAdmin():
+            writeLog("forbidden", session["user_id"])
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+#3-50 characters. allows letters numbers and underscores
+def validUsername(username):
+    return re.match(r'^[A-Za-z0-9_]{3,50}$', username)
+
+#Format: mail@domain.com / name.last@domain.com
+def validEmail(email):
+    return re.match(r'^[a-zA-Z0-9_+&*-]+(?:\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,7}$', email)
+
+#Follows NIST SP800-63B-4 Policy: (minimum 15 characters, maximum 128 characters, no commonly breached passwords)
+def isPasswordValid(password):
+    if len(password) < 15 or len(password) > 128:
+        return False
+
+    with open("data/passwords.txt", encoding="utf-8", errors="ignore") as textFile: #errors ignore skips malformed lines
+        for line in textFile:
+            if line.strip().lower() == password.lower():
+                return "breached"
+            
+    return True
+
+def validPost(title, body):
+    return 0 < len(title) <= 150 and 0 < len(body) <= 5000
+
+
+def validComment(body):
+    return 0 < len(body) <= 1000
+
+
+
+#Exception Handling for error codes
+@app.errorhandler(werkzeug.exceptions.Forbidden)
+def handle_forbidden(e):
+    return "403 Forbidden", 403
+
+@app.errorhandle(werkzeug.exceptions.NotFound)
+def handle_notfound_request(e):
+    return "404 Page Not Found", 404
+
+@app.errorhandler(werkzeug.exceptions.TooManyRequests)
+def handle_rate_limit(e):
+    return "429 Too Many Requests, try again later", 429
+
+#Sends the log to .log file
+@app.errorhandler(werkzeug.exceptions.InternalServerError)
+def handle_server_error(e):
+    securityLogger.error("server_error_type=%s", type(e.original_exception).__name__)
+    return "500 Internal Server error", 500
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    flash(e.description, "warning")
+    return redirect(url_for("home"))
