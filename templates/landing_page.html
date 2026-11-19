@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>MyBlog  - Secure Blog Post Application</h1>
+    <p>Create your own posts, read other people's posts and leave comments</p>
+    <p><a href="{{ url_for('register') }}">Register</a> or <a href="{{ url_for('login') }}">Login</a></p>
+{% endblock %}

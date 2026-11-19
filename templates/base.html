@@ -1,0 +1,23 @@
+<!-- Sources: 
+ Jinja template inheritance https://jinja.palletsprojects.com/en/stable/templates/#template-inheritance 
+ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MyBlog">
+    <title>{% block title %}MyBlog - Secure Blog Post Application{% endblock %}</title>
+
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include "navpartial.html" %}
+    <main>
+        {% include "flashpartial.html" %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

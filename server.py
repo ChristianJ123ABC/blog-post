@@ -206,3 +206,84 @@ def handle_server_error(e):
 def handle_csrf_error(e):
     flash(e.description, "warning")
     return redirect(url_for("home"))
+
+
+
+
+
+# - - - - - - -
+#   USER ACCOUNTS (ORDER: Register, Login, Logout, Account, Delete Account)
+# - - - - - - -
+@app.route("/register", methods=["GET", "POST"])
+@rateLimiter.limit("5 per minute", methods=["POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html")
+
+    username = request.form["username"].strip()
+    email = request.form["email"].strip().lower()
+    password = request.form["password"]
+
+    if isPasswordValid(password) == "breached":
+        flash("That password is on a list of commonly breached passwords, choose another one.", "danger")
+        return render_template("register.html", username=username, email=email)
+
+    if not validUsername(username) or not validEmail(email) or isPasswordValid(password) == False:
+        flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
+        return render_template("register.html", username=username, email=email)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+    #Same error message to avoid specifying what usernames / emails are registered
+    if cursor.fetchone():
+        cursor.close()
+        flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
+        return render_template("register.html", username=username, email=email)
+
+    #Password hash using scrypt 131072:8:1
+    cursor.execute("INSERT INTO users (username, email, hashed_password) VALUES (%s, %s, %s)", (username, email, generate_password_hash(password, method=hashMethod)))
+    mysql.connection.commit()
+    newUserId = cursor.lastrowid
+    cursor.close()
+
+    writeLog("register", newUserId)
+    flash("Account Created, please log in", "success")
+    return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET","POST"])
+@rateLimiter.limit("5 per minute", methods=["GET","POST"])
+def login():
+    if request.method == "GET":
+        return render_template("login.html")
+
+    email = request.form["email"].strip().lower()
+    password = request.form["password"]
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id, username, role, hashed_password FROM users WHERE email = %s", (email,))
+    user = cursor.fetchone()
+    cursor.close()
+
+    #Same message for wrong email and password to prevent enumeration attack
+    if not user or not check_password_hash(user["hashed_password"], password):
+        writeLog("failed_login", user["id"] if user else None)
+        flash("Invalid email or password.", "danger")
+        return render_template("login.html")
+
+    session.clear()
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+    session["role"] = user["role"]
+    session.permanent = True
+    writeLog("login", user["id"])
+    return redirect(url_for("dashboard"))
+
+
+#POST so CSRF can stop other websites from logging the user out with a link
+@app.route("/logout", methods=["POST"])
+def logout():
+    if "user_id" in session:
+        writeLog("logout", session["user_id"])
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for("login"))
