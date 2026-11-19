@@ -1,11 +1,11 @@
-<nav>
+<nav aria-label="Main">
     <a class="brand" href="{{ url_for('home') }}">MyBlog</a>
     <div class="links">
         {% if session.user_id %}
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
             <a href="{{ url_for('new_post') }}">Create Post</a>
             <a href="{{ url_for('account') }}">Account</a>
-            <a>Signed in as: {% session.username %}</a>
+            <a>Signed in as: {{ session.username }}</a>
             {% if session.role == 'admin' %}
                 <a href="{{ url_for('admin_logs') }}">Security logs</a>
             {% endif %}

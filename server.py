@@ -188,7 +188,7 @@ def validComment(body):
 def handle_forbidden(e):
     return "403 Forbidden", 403
 
-@app.errorhandle(werkzeug.exceptions.NotFound)
+@app.errorhandler(werkzeug.exceptions.NotFound)
 def handle_notfound_request(e):
     return "404 Page Not Found", 404
 
@@ -287,3 +287,9 @@ def logout():
     session.clear()
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
+
+
+
+#debug is OFF so error pages never show code
+if __name__ == "__main__":
+    app.run(debug=False, host="127.0.0.1", port=5000)
