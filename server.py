@@ -28,6 +28,9 @@
         #NIST SP800-63B-4: https://pages.nist.gov/800-63-4/sp800-63b.html
         #100,000 commonly breached passwords: https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt
 
+#Search bar
+    #https://www.geeksforgeeks.org/python/using-request-args-for-a-variable-url-in-flask/
+    #https://stackoverflow.com/questions/56387161/flask-search-bar-using-postgres
 
 
 import re, os, logging, werkzeug
