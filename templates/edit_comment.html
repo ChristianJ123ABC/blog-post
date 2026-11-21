@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Edit comment{% endblock %}
+{% block content %}
+    <h1>Edit Comment</h1>
+    <form method="POST" action="{{ url_for('edit_comment', comment_id=comment.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="body">Comment</label>
+        <textarea id="body" name="body" rows="4" required maxlength="1000">{{ comment.body }}</textarea>
+        <button type="submit">Save</button>
+    </form>
+    <p><a href="{{ url_for('view_post', post_id=comment.post_id) }}">Return to post</a></p>
+{% endblock %}

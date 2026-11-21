@@ -17,4 +17,32 @@
             </form>
         {% endif %}
     </div>
+
+    <h2>Comments</h2>
+    {% for comment in comments %}
+        <div class="comment">
+            <p><strong>{{ comment.username }}</strong> {{ comment.created_at.strftime('%d %b %Y %H:%M') }}</p>
+            <p class="comment-body">{{ comment.body }}</p>
+            <div class="actions">
+                {% if comment.user_id == session.user_id %}
+                    <a href="{{ url_for('edit_comment', comment_id=comment.id) }}">Edit comment</a>
+                {% endif %}
+                {% if comment.user_id == session.user_id or userIsAdmin %}
+                    <form method="POST" action="{{ url_for('delete_comment', comment_id=comment.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="danger">Delete comment</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <p>No comments yet.</p>
+    {% endfor %}
+
+    <form method="POST" action="{{ url_for('add_comment', post_id=post.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="comment">Add New Comment</label>
+        <textarea id="comment" name="body" rows="3" required maxlength="1000"></textarea>
+        <button type="submit">Comment</button>
+    </form>
 {% endblock %}

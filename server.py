@@ -251,7 +251,7 @@ def register():
     return redirect(url_for("login"))
 
 @app.route("/login", methods=["GET","POST"])
-@rateLimiter.limit("5 per minute", methods=["GET","POST"])
+@rateLimiter.limit("5 per minute", methods=["POST"])
 def login():
     if request.method == "GET":
         return render_template("login.html")
@@ -347,14 +347,14 @@ def dashboard():
 @loginRequired
 def new_post():
     if request.method == "GET":
-        return render_template("edit_post.html", title="", body="", postId=None)
+        return render_template("edit_post.html", title="", body="", ePostId=None) #ePostId is named that to not be confused with view_post's post_id.
 
     title = request.form["title"].strip()
     body = request.form["body"].strip()
 
     if not validPost(title,body):
         flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
-        return render_template("edit_post.html", title=title, body=body, postId=None)
+        return render_template("edit_post.html", title=title, body=body, ePostId=None)
 
     cursor = mysql.connection.cursor()
     cursor.execute("INSERT INTO posts (user_id, title, body) VALUES (%s, %s, %s)", (session["user_id"],title,body))
@@ -385,6 +385,7 @@ def view_post(post_id):
 
 @app.route("/post/<int:post_id>/edit", methods=["GET","POST"])
 @loginRequired
+@rateLimiter.limit("5 per minute", methods=["POST"])
 def edit_post(post_id):
     cursor = mysql.connection.cursor()
     cursor.execute("SELECT id, title, body, user_id FROM posts WHERE id = %s", (post_id,))
@@ -400,14 +401,14 @@ def edit_post(post_id):
         abort(403)
 
     if request.method == "GET":
-        return render_template("edit_post.html", title=post["title"], body=post["body"], postId=post_id)
+        return render_template("edit_post.html", title=post["title"], body=post["body"], ePostId=post_id)
 
     title = request.form["title"].strip()
     body = request.form["body"].strip()
 
     if not validPost(title,body):
         flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
-        return render_template("edit_post.html", title=title, body=body, postId=post_id)
+        return render_template("edit_post.html", title=title, body=body, ePostId=post_id)
 
     cursor = mysql.connection.cursor()
     cursor.execute("UPDATE post SET title = %s, body = %s WHERE id = %s", (title, body, post_id))
@@ -422,6 +423,7 @@ def edit_post(post_id):
 
 @app.route("/post/<int:post_id>/delete", methods=["POST"])
 @loginRequired
+@rateLimiter.limit("5 per minute", methods=["POST"])
 def delete_post(post_id):
     cursor = mysql.connection.cursor()
     cursor.execute("SELECT user_id FROM posts WHERE id = %s", (post_id,))
@@ -443,6 +445,63 @@ def delete_post(post_id):
     cursor.close()
 
 
+@app.route("/post/<int:post_id>/comment", methods=["POST"])
+@loginRequired
+@rateLimiter.limit("5 per minute", methods=["POST"])
+def add_comment(post_id):
+    body = request.form["body"].strip()
+
+    if not validComment(body):
+        flash("Comments must be between 1 to 1000 characters", "danger")
+        return redirect(url_for("view_post", post_id=post_id))
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id FROM posts WHERE id = %s", (post_id,))
+    if not cursor.fetchone():
+        cursor.close()
+        abort(404)
+
+    cursor.execute("INSERT INTO comments (post_id, user_id, body) VALUES (%s,%s,%s)", (post_id, session["user_id"], body))
+    mysql.connection.commit()
+    cursor.close()
+    writeLog("add_comment", session["user_id"])
+    return redirect(url_for("view_post", post_id=post_id))
+
+@app.route("/comment/<int:comment_id>/edit", methods=["GET","POST"])
+@loginRequired
+@rateLimiter.limit("5 per minute", methods=["POST"])
+def edit_comment(comment_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id, post_id, user_id, body FROM comments WHERE id = %s", (comment_id,))
+    comment = cursor.fetchone()
+    cursor.close()
+
+    if not comment():
+        abort (404)
+
+    if comment["user_id"] != session["user_id"]:
+        writeLog("forbidden", session["user_id"])
+        abort(403)
+
+    if request.method == "GET":
+        return render_template("edit_comment.html", comment=comment)
+
+    body = request.form["body"].strip()
+
+    if not validComment(body):
+        flash("Comments must be between 1 and 1000 characters", "danger")
+        return render_template("edit_comment.html", comment=comment)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("UPDATE comments SET body = %s WHERE id = %s", (body, comment_id))
+    mysql.connection.commit()
+    cursor.close()
+
+    writeLog("edit_comment", session["user_id"])
+    flash("Comment updated", "success")
+    return redirect(url_for("view_post", post_id=comment["post_id"]))
+
+@app.route("/comment/<int:comment_id>/delete", methods=["POST"])
 
 
 
