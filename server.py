@@ -323,6 +323,128 @@ def delete_account():
     cursor.close()
 
 
+# - - - - - - - - - -
+# POSTS AND COMMENTS (ORDER: Dashboard + Search, New Post, View Post, Edit Post, Delete Post, Comments, Admin Logs)
+# - - - - - - - - - -
+@app.route("/dashboard")
+@loginRequired
+def dashboard():
+    search  = request.args.get("q", "").strip()[:100]
+    cursor = mysql.connection.cursor()
+
+    #Searchs and filters the posts by their title. If nothing is typed, it displays all posts
+    if search:
+        cursor.execute("SELECT p.id, p.title, p.created_at, u.username FROM posts p JOIN users u on p.user_id = u.id WHERE p.title LIKE %s ORDER BY p.created_at DESC", ("%" + search + "%",))
+    else:
+        cursor.execute("SELECT p.id, p.title, p.created_at, u.username FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC")
+    posts = cursor.fetchall()
+    cursor.close()
+
+    return render_template("dashboard.html", posts=posts, search=search)
+
+
+@app.route("/post/new", methods=["GET","POST"])
+@loginRequired
+def new_post():
+    if request.method == "GET":
+        return render_template("edit_post.html", title="", body="", postId=None)
+
+    title = request.form["title"].strip()
+    body = request.form["body"].strip()
+
+    if not validPost(title,body):
+        flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
+        return render_template("edit_post.html", title=title, body=body, postId=None)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("INSERT INTO posts (user_id, title, body) VALUES (%s, %s, %s)", (session["user_id"],title,body))
+    mysql.connection.commit()
+    newPostId = cursor.lastrowid
+    cursor.close()
+
+    writeLog("create_post", session["user_id"])
+    return redirect(url_for("view_post", post_id=newPostId))
+
+
+@app.route("/post/<int:post_id>")
+@loginRequired
+def view_post(post_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT p.id, p.title, p.body, p.user_id, p.created, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = %s", (post_id,))
+    post = cursor.fetchone()
+
+    if not post():
+        cursor.close()
+        abort(404)
+
+    cursor.execute("SELECT c.id, c.user_id, c.body, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.post_id = %s ORDER BY c.created_at", (post_id,))
+    comments = cursor.fetchall()
+    cursor.close()
+
+    return render_template("view_post.html", post=post, comments=comments, userIsAdmin=isAdmin())
+
+@app.route("/post/<int:post_id>/edit", methods=["GET","POST"])
+@loginRequired
+def edit_post(post_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT id, title, body, user_id FROM posts WHERE id = %s", (post_id,))
+    post = cursor.fetchone()
+    cursor.close()
+
+    if not post:
+        abort(404)
+
+    #Only the owner of the post can edit it
+    if post["user_id"] != session["user_id"]:
+        writeLog("forbidden", session["user_id"])
+        abort(403)
+
+    if request.method == "GET":
+        return render_template("edit_post.html", title=post["title"], body=post["body"], postId=post_id)
+
+    title = request.form["title"].strip()
+    body = request.form["body"].strip()
+
+    if not validPost(title,body):
+        flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
+        return render_template("edit_post.html", title=title, body=body, postId=post_id)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute("UPDATE post SET title = %s, body = %s WHERE id = %s", (title, body, post_id))
+    mysql.conneciton.commit()
+    cursor.close()
+
+    writeLog("edit_post", session["user_id"])
+    flash("Post updated", "success")
+    return redirect(url_for("view_post", post_id=post_id))
+
+
+
+@app.route("/post/<int:post_id>/delete", methods=["POST"])
+@loginRequired
+def delete_post(post_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT user_id FROM posts WHERE id = %s", (post_id,))
+    post = cursor.fetchone()
+
+    if not post:
+        cursor.close()
+        abort(404)
+
+    #Only the owner of the post and an admin can delete the post
+    if post["user_id"] != session["user_id"] and not isAdmin():
+        cursor.close()
+        writeLog("forbidden", session["user_id"])
+        abort(403)
+
+
+    cursor.execute("DELETE FROM posts WHERE id = %s", (post_id,))
+    mysql.connection.commit()
+    cursor.close()
+
+
+
+
 
 
 #debug is OFF so error pages never show code
