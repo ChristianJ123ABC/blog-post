@@ -288,6 +288,41 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
 
+#Displays users data held about them (GDPR Right of access)
+@app.route("/account")
+@loginRequired
+def account():
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT username, email, created_at FROM users WHERE id = %s", (session["user_id"]))
+    user = cursor.fetchone()
+    cursor.close()
+    return render_template("account.html", user=user)
+
+
+#Deletes users account (GDPR right to erasure)
+@app.route("/account/delete", methods=["POST"])
+@rateLimiter.limit("5 per minute")
+@loginRequired
+def delete_account():
+    password = request.form["password"]
+    userId = session["user_id"]
+
+    cursor = mysql.connection.cursor()
+    cursor.execute4("SELECT hashed_password FROM users WHERE id = %s", (userId,))
+    user = cursor.fetchone()
+
+    if not check_password_hash(user["hashed_password"], password):
+        cursor.close()
+        writeLog("failed_account_delete", userId)
+        flash("Password incorrect")
+        return redirect(url_for("account"))
+
+    writeLog("delete_account", userId)
+    cursor.execute("DELETE FROM users WHERE id = %s", (userId,))
+    mysql.connection.commit()
+    cursor.close()
+
+
 
 
 #debug is OFF so error pages never show code
