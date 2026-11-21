@@ -502,7 +502,40 @@ def edit_comment(comment_id):
     return redirect(url_for("view_post", post_id=comment["post_id"]))
 
 @app.route("/comment/<int:comment_id>/delete", methods=["POST"])
+@loginRequired
+@rateLimiter.limit("5 per minute", methods=["POST"])
+def delete_comment(comment_id):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT post_id, user_id FROM comments WHERE id = %s", (comment_id,))
+    comment = cursor.fetchone()
 
+    if not comment:
+        cursor.close()
+        abort(404)
+
+    #Only owner of comment can delete their comment besides an admin
+    if comment["user_id"] != session["user_id"] and not isAdmin():
+        cursor.close()
+        writeLog("forbidden", session["user_id"])
+        abort(403)
+
+    cursor.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
+    mysql.connection.commit()
+    cursor.close()
+
+    writeLog("delete_comment", session["user_id"])
+    flash("Comment deleted", "success")
+    return redirect(url_for("view_post", post_id=comment["post_id"]))
+
+#Displays 50 latest events that have occurred in the app
+@app.route("/admin/logs")
+@adminRequired
+def admin_logs():
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT l.created_at, l.action, l.ip_address, u.username FROM logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT 50")
+    logs = cursor.fetchall()
+    cursor.close()
+    return render_template("admin_logs.html", logs=logs, warningActions=warningActions)
 
 
 
