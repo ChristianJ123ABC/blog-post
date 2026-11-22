@@ -50,9 +50,9 @@ csrf = CSRFProtect(app)
 
 #Database setup
 app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
+app.config['MYSQL_USER'] = os.getenv('INSECURE_MYSQL_USER')
+app.config['MYSQL_PASSWORD'] = os.getenv('INSECURE_MYSQL_PASSWORD')
+app.config['MYSQL_DB'] = os.getenv('INSECURE_MYSQL_DB')
 app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT'))
 app.config["MYSQL_CHARSET"] = os.getenv("MYSQL_CHARSET") 
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
@@ -285,10 +285,12 @@ def login():
 #POST so CSRF can stop other websites from logging the user out with a link
 @app.route("/logout", methods=["POST"])
 def logout():
-    if "user_id" in session:
-        writeLog("logout", session["user_id"])
+    userId = session.get("user_id")
     session.clear()
-    flash("You have been logged out.", "success")
+    try:
+        writeLog("logout", userId)
+    except Exception:
+        app.logger.exception("logout log failed")
     return redirect(url_for("login"))
 
 #Displays users data held about them (GDPR Right of access)
