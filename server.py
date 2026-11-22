@@ -111,7 +111,7 @@ securityLogger.addHandler(consoleHandler)
 @app.route("/")
 def home():
     if "user_id" in session:
-        return render_template("dashboard.html")
+        return redirect(url_for("dashboard"))
     
     return render_template("landing_page.html")
 
