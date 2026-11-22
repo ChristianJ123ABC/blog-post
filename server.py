@@ -46,7 +46,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 app = Flask(__name__, template_folder='templates')
-csrf = CSRFProtect(app) 
+#csrf = CSRFProtect(app) TURNED OFF FOR SENSITIVE DATA EXPOSURE: CSRF tokens are no longer required
 
 #Database setup
 app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
@@ -59,7 +59,7 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 
 #Encrypts connection to railway with TLS (prevents emails and password from being sent to railway in plaintext) (Refuses to connect without it)
-app.config["MYSQL_CUSTOM_OPTIONS"] = {"ssl_mode": "REQUIRED"}
+#app.config["MYSQL_CUSTOM_OPTIONS"] = {"ssl_mode": "REQUIRED"} TURNED OFF FOR SENSITIVE DATA EXPOSURE CWE-319: emails / passwords are sent in plaintext to database
 
 #Session management
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=15)
@@ -79,6 +79,7 @@ rateLimiter = Limiter(
 
 #OWASP recommendation: scrypt memory cost has to be a minimum of 131072, Werkzeug's is 32768. This makes it more secure, but hashes are created slower.
 #hashMethod = "scrypt:131072:8:1" TURNED OFF
+
 
 
 
@@ -208,7 +209,7 @@ def handle_rate_limit(e):
 @app.errorhandler(werkzeug.exceptions.InternalServerError)
 def handle_server_error(e):
     securityLogger.error("server_error_type=%s", type(e.original_exception).__name__)
-    return "500 Internal Server error", 500
+    return f"500 Internal Server error: {e.original_exception}", 500 #CWE-209: ERROR MESSAGE INFO EXPOSURE
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
@@ -248,6 +249,7 @@ def register():
         flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
         return render_template("register.html", username=username, email=email)
 
+    #CWE-256 PLAINTEXT PASSWORD
     cursor.execute("INSERT INTO users (username, email, hashed_password) VALUES (%s, %s, %s)", (username, email, password))
     mysql.connection.commit()
     newUserId = cursor.lastrowid
@@ -323,7 +325,7 @@ def delete_account():
     cursor.execute("SELECT hashed_password FROM users WHERE id = %s", (userId,))
     user = cursor.fetchone()
 
-    if not check_password_hash(user["hashed_password"], password):
+    if not password:
         cursor.close()
         writeLog("failed_account_delete", userId)
         flash("Password incorrect")
@@ -553,4 +555,4 @@ def admin_logs():
 
 #debug is OFF so error pages never show code
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    app.run(debug=False, host="127.0.0.1", port=5000)

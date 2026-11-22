@@ -9,9 +9,9 @@
             {% if session.role == 'admin' %}
                 <a href="{{ url_for('admin_logs') }}">Security logs</a>
             {% endif %}
-            <!-- Logout is a POST form with a CSRF token-->
+     
             <form method="POST" action="{{ url_for('logout') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+             
                 <button type="submit">Log out</button>
             </form>
         {% else %}
