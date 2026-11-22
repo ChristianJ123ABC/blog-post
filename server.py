@@ -78,7 +78,7 @@ rateLimiter = Limiter(
 )
 
 #OWASP recommendation: scrypt memory cost has to be a minimum of 131072, Werkzeug's is 32768. This makes it more secure, but hashes are created slower.
-hashMethod = "scrypt:131072:8:1"
+#hashMethod = "scrypt:131072:8:1" TURNED OFF
 
 
 
@@ -106,6 +106,9 @@ def add_headers(response):
 
 @app.route("/")
 def home():
+    if "user_id" in session:
+        return render_template("dashboard.html")
+    
     return render_template("landing_page.html")
 
 
@@ -244,7 +247,7 @@ def register():
         return render_template("register.html", username=username, email=email)
 
     #Password hash using scrypt 131072:8:1
-    cursor.execute("INSERT INTO users (username, email, hashed_password) VALUES (%s, %s, %s)", (username, email, generate_password_hash(password, method=hashMethod)))
+    cursor.execute("INSERT INTO users (username, email, hashed_password) VALUES (%s, %s, %s)", (username, email, password))
     mysql.connection.commit()
     newUserId = cursor.lastrowid
     cursor.close()
@@ -263,12 +266,15 @@ def login():
     password = request.form["password"]
 
     cursor = mysql.connection.cursor()
-    cursor.execute("SELECT id, username, role, hashed_password FROM users WHERE email = %s", (email,))
+
+    #OWASP A05 Injection / CWE 89: query built by joining the text together rather than %s
+    query = "SELECT id, username, role, hashed_password FROM users WHERE email = '" + email + "'"
+    cursor.execute(query)
     user = cursor.fetchone()
     cursor.close()
 
     #Same message for wrong email and password to prevent enumeration attack
-    if not user or not check_password_hash(user["hashed_password"], password):
+    if not user or not password:
         writeLog("failed_login", user["id"] if user else None)
         flash("Invalid email or password.", "danger")
         return render_template("login.html")
@@ -546,4 +552,4 @@ def admin_logs():
 
 #debug is OFF so error pages never show code
 if __name__ == "__main__":
-    app.run(debug=False, host="127.0.0.1", port=5000)
+    app.run(debug=True, host="127.0.0.1", port=5000)
