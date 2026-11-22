@@ -71,7 +71,7 @@ app.secret_key = os.getenv("SECRET_KEY")
 mysql = MySQL(app)
 
 #Turn this to False in .env when testing with Zap and playwright
-app.config["RATELIMIT_ENABLED"] = os.getenv("RATELIMIT_ENABLED")
+app.config["RATELIMIT_ENABLED"] = os.getenv("RATELIMIT_ENABLED","true").lower() == "true"
 rateLimiter = Limiter(
     get_remote_address,
     app=app,
