@@ -10,8 +10,8 @@
     </form>
 
     {% if search %}
-        <!-- Escaped by Jinja2, so HTML typed into the search box shows as text -->
-        <p>Posts shown by: {{ search }}</p>
+        <!-- |safe turns off auto escaping, allowing raw javascript to be used-->
+        <p>Posts shown by: {{ search|safe }}</p>
     {% endif %}
 
     {% for post in posts %}
@@ -19,7 +19,6 @@
     {% else %}
         <p>No posts found.</p>
     {% endfor %}
-    
-    <!-- NOTE: FINISH .JS FILE TO HIGHLIGHT TITLES IN SEARCH BAR-->
+
     <script src="{{ url_for('static', filename='search.js') }}"></script>
 {% endblock %}

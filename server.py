@@ -94,15 +94,17 @@ securityLogger.setLevel(logging.INFO) #default log if not specified
 securityLogger.addHandler(fileHandler)
 securityLogger.addHandler(consoleHandler)
 
-#Security headers after every response
-@app.after_request
-def add_headers(response):
-    response.headers["Content-Security-Policy"] = "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" #Only loads file from this site and blocks inline scripts (e.g. onclick=alert()) (XSS FIX)
-    response.headers["X-Content-Type-Options"] = "nosniff" #stops browser from guessing file format (XSS fix)
-    response.headers["X-Frame-Options"] = "DENY" #Prevents clickjacking (loading a web page inside <frame>, <embed>, etc)
-    response.headers["Referrer-Policy"] = "no-referrer" #URLs are not sent to other sites
-    response.headers["Cache-Control"] = "no-store" #Pages are not kept by browser after log out
-    return response
+
+
+#TURNED OFF: OWASP A05 / CWE 79 Reflected XSS: Content Security Policy is turned off so inline scripts can be possible
+#@app.after_request
+#def add_headers(response):
+   #response.headers["Content-Security-Policy"] = "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" #Only loads file from this site and blocks inline scripts (e.g. onclick=alert()) (XSS FIX)
+    #response.headers["X-Content-Type-Options"] = "nosniff" #stops browser from guessing file format (XSS fix)
+    #response.headers["X-Frame-Options"] = "DENY" #Prevents clickjacking (loading a web page inside <frame>, <embed>, etc)
+    #response.headers["Referrer-Policy"] = "no-referrer" #URLs are not sent to other sites
+    #response.headers["Cache-Control"] = "no-store" #Pages are not kept by browser after log out
+    #return response
 
 @app.route("/")
 def home():
@@ -246,7 +248,6 @@ def register():
         flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
         return render_template("register.html", username=username, email=email)
 
-    #Password hash using scrypt 131072:8:1
     cursor.execute("INSERT INTO users (username, email, hashed_password) VALUES (%s, %s, %s)", (username, email, password))
     mysql.connection.commit()
     newUserId = cursor.lastrowid

@@ -18,9 +18,7 @@ if (search){
             return;
         }
 
-        const mark = document.createElement("mark");
-        mark.textContent = title.slice(start, start+search.length);
-        link.textContent = title.slice(0, start);
-        link.append(mark, title.slice(start + search.length));
+        //innerHTML sends the string as HTML (e.g. <h1>hi</h1>) instead of plaintext, allowing DOM-based XSS vulnerability
+        link.innerHTML = title.slice(0,start) + "<mark>" + title.slice(start, start + search.length) + "</mark>" + title.slice(start+search.length);
     });
 }
