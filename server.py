@@ -62,10 +62,11 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 #app.config["MYSQL_CUSTOM_OPTIONS"] = {"ssl_mode": "REQUIRED"} TURNED OFF FOR SENSITIVE DATA EXPOSURE CWE-319: emails / passwords are sent in plaintext to database
 
 #Session management
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=15)
-app.config["SESSION_COOKIE_HTTPONLY"] = True #JavaScript cannot read the session cookie
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax" #Blocks cookies from being sent with POSTs from other websites
-app.config["SESSION_COOKIE_SECURE"] = False #False since the app runs on 127.0.0.1 instead of HTTPs
+
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
+#app.config["SESSION_COOKIE_HTTPONLY"] = True #JavaScript cannot read the session cookie
+#app.config["SESSION_COOKIE_SAMESITE"] = "Lax" #Blocks cookies from being sent with POSTs from other websites
+#app.config["SESSION_COOKIE_SECURE"] = False #False since the app runs on 127.0.0.1 instead of HTTPs
 app.secret_key = os.getenv("SECRET_KEY")
 mysql = MySQL(app)
 
