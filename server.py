@@ -285,10 +285,12 @@ def login():
 #POST so CSRF can stop other websites from logging the user out with a link
 @app.route("/logout", methods=["POST"])
 def logout():
-    if "user_id" in session:
-        writeLog("logout", session["user_id"])
+    userId = session.get("user_id")
     session.clear()
-    flash("You have been logged out.", "success")
+    try:
+        writeLog("logout", userId)
+    except Exception:
+        app.logger.exception("logout log failed")
     return redirect(url_for("login"))
 
 #Displays users data held about them (GDPR Right of access)
