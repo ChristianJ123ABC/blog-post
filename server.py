@@ -106,6 +106,8 @@ def add_headers(response):
 
 @app.route("/")
 def home():
+    if "user_id" in session:
+        return render_template("dashboard.html")
     return render_template("landing_page.html")
 
 
