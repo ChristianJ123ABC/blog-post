@@ -2,9 +2,8 @@
 {% block title %}{{ post.title }}{% endblock %}
 {% block content %}
     <h1>{{ post.title }}</h1>
-    <p class="meta">by {{ post.username }} on {{ post.created_at.strftime('%d %b %Y %H:%M') }}</p>>
+    <p class="meta">by {{ post.username }} on {{ post.created_at.strftime('%d %b %Y %H:%M') }}</p>
     <p class="post-body">{{ post.body }}</p>
-
 
     <div class="actions">
         {% if post.user_id == session.user_id %}
