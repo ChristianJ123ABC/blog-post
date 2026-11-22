@@ -7,7 +7,7 @@
 //Highlights search word in each post title on the dashboard
 //Used as demonstration for DOM based XSS (?q=)
 
-const search = (new URLSearchparamas(window.location.search).get("q") || "").trim();
+const search = (new URLSearchParams(window.location.search).get("q") || "").trim();
 
 if (search){
     document.querySelectorAll(".post-row a").forEach(function (link){

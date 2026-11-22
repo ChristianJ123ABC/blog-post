@@ -70,7 +70,7 @@ app.secret_key = os.getenv("SECRET_KEY")
 mysql = MySQL(app)
 
 #Turn this to False in .env when testing with Zap and playwright
-app.config["RATELIMIT_ENABLED"] = os.getenv("RATELIMIT_ENABLED", "true" == "true")
+app.config["RATELIMIT_ENABLED"] = os.getenv("RATELIMIT_ENABLED")
 rateLimiter = Limiter(
     get_remote_address,
     app=app,
@@ -296,7 +296,7 @@ def logout():
 @loginRequired
 def account():
     cursor = mysql.connection.cursor()
-    cursor.execute("SELECT username, email, created_at FROM users WHERE id = %s", (session["user_id"]))
+    cursor.execute("SELECT username, email, created_at FROM users WHERE id = %s", (session["user_id"],))
     user = cursor.fetchone()
     cursor.close()
     return render_template("account.html", user=user)
@@ -311,7 +311,7 @@ def delete_account():
     userId = session["user_id"]
 
     cursor = mysql.connection.cursor()
-    cursor.execute4("SELECT hashed_password FROM users WHERE id = %s", (userId,))
+    cursor.execute("SELECT hashed_password FROM users WHERE id = %s", (userId,))
     user = cursor.fetchone()
 
     if not check_password_hash(user["hashed_password"], password):
@@ -373,10 +373,10 @@ def new_post():
 @loginRequired
 def view_post(post_id):
     cursor = mysql.connection.cursor()
-    cursor.execute("SELECT p.id, p.title, p.body, p.user_id, p.created, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = %s", (post_id,))
+    cursor.execute("SELECT p.id, p.title, p.body, p.user_id, p.created_at, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = %s", (post_id,))
     post = cursor.fetchone()
 
-    if not post():
+    if not post:
         cursor.close()
         abort(404)
 
@@ -414,8 +414,8 @@ def edit_post(post_id):
         return render_template("edit_post.html", title=title, body=body, ePostId=post_id)
 
     cursor = mysql.connection.cursor()
-    cursor.execute("UPDATE post SET title = %s, body = %s WHERE id = %s", (title, body, post_id))
-    mysql.conneciton.commit()
+    cursor.execute("UPDATE posts SET title = %s, body = %s WHERE id = %s", (title, body, post_id))
+    mysql.connection.commit()
     cursor.close()
 
     writeLog("edit_post", session["user_id"])
@@ -479,7 +479,7 @@ def edit_comment(comment_id):
     comment = cursor.fetchone()
     cursor.close()
 
-    if not comment():
+    if not comment:
         abort (404)
 
     if comment["user_id"] != session["user_id"]:
