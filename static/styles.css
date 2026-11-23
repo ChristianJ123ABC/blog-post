@@ -36,3 +36,21 @@ a {
 html{
     background-color: rgb(201, 190, 190);
 }
+
+.alert { 
+    padding: 12px; 
+    border-radius: 4px;
+    margin-bottom: 16px; 
+}
+.alert-success { 
+    background: #e6f4ea; 
+    color: #1e4620; 
+}
+.alert-danger { 
+    background: #fdecea; 
+    color: #7a1c1c; 
+}
+.alert-warning { 
+    background: #fff4e5; 
+    color: #5c3d00; 
+}
