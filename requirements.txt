@@ -7,3 +7,5 @@ cryptography
 gunicorn
 requests
 datetime
+pytest-playwright
+pytest
