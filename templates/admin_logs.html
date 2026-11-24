@@ -2,6 +2,23 @@
 {% block title %}Security logs{% endblock %}
 {% block content %}
     <h1>Security logs</h1>
+
+    <!-- Monitoring -->
+    <h2>Warnings in the last 24 hours</h2>
+    {% if summary %}
+        <table class="summary">
+            <thead><tr><th scope="col">Warning</th><th scope="col">Count</th></tr></thead>
+            <tbody>
+                {% for row in summary %}
+                    <tr><td>{{ row.action }}</td><td>{{ row.total }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No warnings in the last 24 hours.</p>
+    {% endif %}
+
+     <!-- Logging -->
     <p>50 Latest User Events</p>
     <table>
         <thead><tr><th scope="col">Time</th><th scope="col">Action</th><th scope="col">User</th><th scope="col">IP address</th></tr></thead>

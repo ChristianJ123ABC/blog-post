@@ -8,6 +8,7 @@
     #https://docs.python.org/3/howto/logging.html
     #https://www.geeksforgeeks.org/python/logging-in-python/
     #Writing to a log: https://last9.io/blog/flask-logging/
+    #Displaying logs in the last 24 hours: https://stackoverflow.com/questions/1888544/how-to-select-records-from-last-24-hours-using-sql
 
 #Security Headers + Session management
     #https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html
@@ -59,7 +60,8 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 
 #Encrypts connection to railway with TLS (prevents emails and password from being sent to railway in plaintext) (Refuses to connect without it)
-app.config["MYSQL_CUSTOM_OPTIONS"] = {"ssl_mode": "REQUIRED"}
+#Multi statements prevents several SQL statements from being executed in a single call
+app.config["MYSQL_CUSTOM_OPTIONS"] = {"ssl_mode": "REQUIRED", "multi_statements": False}
 
 #Session management
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=15)
@@ -119,7 +121,7 @@ def home():
 # - - - - - - -
 
 #Types of actions logged as WARNING
-warningActions = ["failed_login", "forbidden", "failed_account_delete"]
+warningActions = ["failed_login", "forbidden", "failed_account_delete", "rejected_input", "csrf_failed", "rate_limited"]
 
 def writeLog(action, userId=None):
     cursor = mysql.connection.cursor()
@@ -127,7 +129,8 @@ def writeLog(action, userId=None):
     mysql.connection.commit()
     cursor.close()
     level = logging.WARNING if action in warningActions else logging.INFO
-    securityLogger.log(level, "action=%s user_id=%s ip=%s", action, userId, get_remote_address())
+    #%r prints the path in quotes to prevent fake lines from being added to the URL
+    securityLogger.log(level, "action=%s user_id=%s ip=%s path=%r", action, userId, get_remote_address(), request.path)
 
 
 #Decorator Patterns:  checks if the user is logged in or if an admin is required. these are re-used with every route that needs it.
@@ -200,6 +203,7 @@ def handle_notfound_request(e):
 
 @app.errorhandler(werkzeug.exceptions.TooManyRequests)
 def handle_rate_limit(e):
+    writeLog("rate_limited", session.get("user_id"))
     return "429 Too Many Requests, try again later", 429
 
 #Sends the log to .log file
@@ -210,7 +214,8 @@ def handle_server_error(e):
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
-    flash(e.description, "warning")
+    writeLog("csrf_failed", session.get("user_id"))
+    flash("Session expired, please try again", "warning")
     return redirect(url_for("home"))
 
 
@@ -231,10 +236,12 @@ def register():
     password = request.form["password"]
 
     if isPasswordValid(password) == "breached":
+        writeLog("rejected_input")
         flash("That password is on a list of commonly breached passwords, choose another one.", "danger")
         return render_template("register.html", username=username, email=email)
 
     if not validUsername(username) or not validEmail(email) or isPasswordValid(password) == False:
+        writeLog("rejected_input")
         flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
         return render_template("register.html", username=username, email=email)
 
@@ -243,6 +250,7 @@ def register():
     #Same error message to avoid specifying what usernames / emails are registered
     if cursor.fetchone():
         cursor.close()
+        writeLog("rejected_input")
         flash("Registration invalid: Check the username (3 to 50 letters, numbers or _), the email and the password (15 to 128 characters).", "danger")
         return render_template("register.html", username=username, email=email)
 
@@ -330,6 +338,9 @@ def delete_account():
     mysql.connection.commit()
     cursor.close()
 
+    session.clear()
+    flash("Your account has been deleted, alongside your posts and comments", "success")
+    return redirect(url_for("home"))
 
 # - - - - - - - - - -
 # POSTS AND COMMENTS (ORDER: Dashboard + Search, New Post, View Post, Edit Post, Delete Post, Comments, Admin Logs)
@@ -361,6 +372,7 @@ def new_post():
     body = request.form["body"].strip()
 
     if not validPost(title,body):
+        writeLog("rejected_input", session["user_id"])
         flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
         return render_template("edit_post.html", title=title, body=body, ePostId=None)
 
@@ -415,6 +427,7 @@ def edit_post(post_id):
     body = request.form["body"].strip()
 
     if not validPost(title,body):
+        writeLog("rejected_input", session["user_id"])
         flash("Title must be between 1 and 150 characters and the body to be between 1 and 5000 characters.", "danger")
         return render_template("edit_post.html", title=title, body=body, ePostId=post_id)
 
@@ -452,6 +465,10 @@ def delete_post(post_id):
     mysql.connection.commit()
     cursor.close()
 
+    writeLog("delete_post", session["user_id"])
+    flash("Post deleted", "success")
+    return redirect(url_for("dashboard"))
+
 
 @app.route("/post/<int:post_id>/comment", methods=["POST"])
 @loginRequired
@@ -460,6 +477,7 @@ def add_comment(post_id):
     body = request.form["body"].strip()
 
     if not validComment(body):
+        writeLog("rejected_input", session["user_id"])
         flash("Comments must be between 1 to 1000 characters", "danger")
         return redirect(url_for("view_post", post_id=post_id))
 
@@ -471,6 +489,7 @@ def add_comment(post_id):
 
     cursor.execute("INSERT INTO comments (post_id, user_id, body) VALUES (%s,%s,%s)", (post_id, session["user_id"], body))
     mysql.connection.commit()
+
     cursor.close()
     writeLog("add_comment", session["user_id"])
     return redirect(url_for("view_post", post_id=post_id))
@@ -497,6 +516,7 @@ def edit_comment(comment_id):
     body = request.form["body"].strip()
 
     if not validComment(body):
+        writeLog("rejected_input", session["user_id"])
         flash("Comments must be between 1 and 1000 characters", "danger")
         return render_template("edit_comment.html", comment=comment)
 
@@ -535,15 +555,17 @@ def delete_comment(comment_id):
     flash("Comment deleted", "success")
     return redirect(url_for("view_post", post_id=comment["post_id"]))
 
-#Displays 50 latest events that have occurred in the app
+#Displays 50 latest events that have occurred in the app and how many warnings happened in the last 24 hours
 @app.route("/admin/logs")
 @adminRequired
 def admin_logs():
     cursor = mysql.connection.cursor()
+    cursor.execute("SELECT action, COUNT(*) AS total FROM logs WHERE created_at >= NOW() - INTERVAL 1 dAY GROUP BY action ORDER BY total DESC")
+    summary = [row for row in cursor.fetchall() if row["action"] in warningActions] #Display on the warning actions
     cursor.execute("SELECT l.created_at, l.action, l.ip_address, u.username FROM logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT 50")
     logs = cursor.fetchall()
     cursor.close()
-    return render_template("admin_logs.html", logs=logs, warningActions=warningActions)
+    return render_template("admin_logs.html", summary=summary, logs=logs, warningActions=warningActions)
 
 
 
