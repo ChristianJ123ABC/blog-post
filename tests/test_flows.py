@@ -7,7 +7,7 @@
 
 #How to start tests effectively: Start the app first with ratelimit_enabled = false in .env, then run pytests tests/ --browser-channel chrome
 
-import os, uuid
+import os, uuid, pytest
 from dotenv import load_dotenv
 from playwright.sync_api import Page, expect
 load_dotenv()
@@ -59,10 +59,12 @@ def logout(page):
 
 
 # - - - - - - - - - -
-# TESTS (TC01 - TC16)
+# TESTS
 # - - - - - - - - - -
 
+#TC-01 (UC-1 normal flow)
 def test_tc01_register(page: Page):
     username, email = newUser()
     register(page, username, email)
     expect(page.locator(".alert")).to_contain_text("Account Created") #.alert = flash message class
+
