@@ -8,7 +8,6 @@
 #How to start tests effectively: 
 # TC01-19: Start the app first with ratelimit_enabled = false in .env, then run pytests tests/ 
 # TC-20: turn ratelimit_enabled = true, then run tests again
-
 import os, uuid, pytest
 from dotenv import load_dotenv
 from playwright.sync_api import Page, expect
@@ -249,3 +248,21 @@ def test_tc20_login_rate_limit(page: Page):
     for attempt in range(6):
         login(page, "nobody@example.com", "wrong-password-123456")
     expect(page.locator("body")).to_contain_text("429 Too Many Requests")
+
+#TC-24 (UC-2 login: SQL injection in the email field is treated as data and not SQL)
+def test_tc24_login_sql_injection(page: Page):
+    registerAndLogin(page)   #makes sure at least one user exists in the users table
+    logout(page)
+
+    page.goto(BASE + "/login")
+    #browser validation only checks the email format; turn it off so the payload reaches the server
+    page.evaluate("document.querySelector('form').noValidate = true")
+    page.fill("#email", "' OR '1'='1'#")
+    page.fill("#password", "anything")
+    page.click("main button")
+
+    #secure: the query is parameterised, so the injected string matches no user and login fails
+    expect(page).to_have_url(BASE + "/login")
+    expect(page.locator("body")).to_contain_text("Invalid email or password.")
+
+    
