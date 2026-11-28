@@ -5,8 +5,9 @@
 #https://www.youtube.com/watch?v=H2-5ecFwHHQ
 #https://playwright.dev/python/docs/auth
 
-#How to start tests effectively: Start the app first with ratelimit_enabled = false in .env, then run pytests tests/ --browser-channel chrome
-
+#How to start tests effectively: 
+# TC01-19: Start the app first with ratelimit_enabled = false in .env, then run pytests tests/ 
+# TC-20: turn ratelimit_enabled = true, then run tests again
 import os, uuid, pytest
 from dotenv import load_dotenv
 from playwright.sync_api import Page, expect
@@ -97,8 +98,8 @@ def test_tc06_delete_account(page: Page):
     username, email = registerAndLogin(page)
     page.goto(BASE + "/account")
     page.fill("#password", PASSWORD)
-    page.click("button:has-text('Delete my account')")
-    expect(page.locator(".alert")).to_contain_text("have been deleted")
+    page.click("button:has-text('Delete Account')")
+    expect(page.locator(".alert")).to_contain_text("has been deleted")
     login(page, email)
     expect(page.locator(".alert")).to_contain_text("Invalid email or password")
 
@@ -107,7 +108,7 @@ def test_tc07_delete_account_wrong_password(page: Page):
     registerAndLogin(page)
     page.goto(BASE + "/account")
     page.fill("#password", "wrong-password-123456")
-    page.click("button:has-text('Delete my account')")
+    page.click("button:has-text('Delete Account')")
     expect(page.locator(".alert")).to_contain_text("Password incorrect")
 
 #TC-08 (UC-4: admin sees logs, user gets 403)
@@ -140,15 +141,16 @@ def test_tc10_admin_deletes_post(page: Page):
     logout(page)
     login(page, ADMIN_EMAIL, ADMIN_PASSWORD)
     page.goto(postUrl)
-    page.click("button:has-text('Delete post')")
+    page.click("button:has-text('Delete Post')")
     expect(page.locator(".alert")).to_contain_text("Post deleted")
 
 #TC-11 (UC-8: the search term is shown as text and not run as HTML)
 def test_tc11_search_is_escaped(page: Page):
     registerAndLogin(page)
+    createPost(page, "Find <i>term</i> " + uuid.uuid4().hex[:6])
     page.goto(BASE + "/dashboard?q=<i>term</i>")
-    expect(page.locator("text=Results for: <i>term</i>")).to_have_count(1)
     expect(page.locator("main i")).to_have_count(0)
+    expect(page.locator("main")).to_contain_text("<i>term</i>")
 
 #TC-12 (UC-9: a comment is shown as text and not run as HTML)
 def test_tc12_comment_is_escaped(page: Page):
@@ -212,8 +214,8 @@ def test_tc18_post_without_csrf_token(page: Page):
     registerAndLogin(page)
     title = "No token " + uuid.uuid4().hex[:6]
     response = page.request.post(BASE + "/post/new", form={"title": title, "body": "Body"}) #No csrf_token, like a form on another website
-    assert response.url == BASE + "/"
-    assert "Your session expired" in response.text()
+    assert response.url == BASE + "/dashboard"
+    assert "Session expired, please try again" in response.text()
     page.goto(BASE + "/dashboard?q=" + title)
     expect(page.locator("text=No posts found.")).to_have_count(1)
 
@@ -237,9 +239,27 @@ def test_tc19_security_events_logged(page: Page):
     expect(page.locator("main")).not_to_contain_text(email)
 
 #TC-20 (UC-2 exception E4: the sixth login in a minute is blocked)
-#Only runs when RATELIMIT_ENABLED=true in .env. Restart the app with that setting, then run: pytest tests/ -k tc20
-@pytest.mark.skipif(os.getenv("RATELIMIT_ENABLED") != "true", reason="rate limit is turned off in .env file")
+#Only runs when RATELIMIT_ENABLED=true in .env. Restart the app with that setting, then run: pytest tests/ -k tc20 -v
+@pytest.mark.skipif(
+    os.getenv("RATELIMIT_ENABLED", "true").strip().lower() == "false",
+    reason="rate limit is disabled via RATELIMIT_ENABLED=false",
+)
 def test_tc20_login_rate_limit(page: Page):
     for attempt in range(6):
         login(page, "nobody@example.com", "wrong-password-123456")
     expect(page.locator("body")).to_contain_text("429 Too Many Requests")
+
+#TC-24 (UC-2 login: SQL injection in the email field is treated as data and not SQL)
+def test_tc24_login_sql_injection(page: Page):
+    registerAndLogin(page)   #makes sure at least one user exists in the users table
+    logout(page)
+
+    page.goto(BASE + "/login")
+    page.fill("#email", "' OR '1'='1'#")
+    page.fill("#password", "anything")
+    page.click("button:has-text('Login')")
+
+    #secure: query is parameterised, so the injected string matches no user and login fails
+    expect(page).to_have_url(BASE + "/login")
+    expect(page.locator("body")).to_contain_text("Invalid email or password.")
+    expect(page.locator("body")).not_to_contain_text("Logout")

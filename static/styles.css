@@ -80,3 +80,11 @@ form textarea {
   min-height: 44px;
   min-width: 44px;
 }
+
+a { 
+    color: #0a2a66; 
+    text-decoration: underline; 
+}
+label { 
+    color: #111; 
+}

@@ -289,8 +289,8 @@ def login():
     cursor.close()
 
     #Same message for wrong email and password to prevent enumeration attack
-    if not user or not password:
-        writeLog("failed_login", user["id"] if user else None)
+    if not user:
+        writeLog("failed_login", None)
         flash("Invalid email or password.", "danger")
         return render_template("login.html")
 
@@ -337,7 +337,7 @@ def delete_account():
     cursor.execute("SELECT hashed_password FROM users WHERE id = %s", (userId,))
     user = cursor.fetchone()
 
-    if not password:
+    if not user or user["hashed_password"] != password:
         cursor.close()
         writeLog("failed_account_delete", userId)
         flash("Password incorrect")
