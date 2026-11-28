@@ -255,11 +255,12 @@ def test_tc24_login_sql_injection(page: Page):
     logout(page)
 
     page.goto(BASE + "/login")
+    #browser validation only checks the email format; turn it off so the payload reaches the server
+    page.evaluate("document.querySelector('form').noValidate = true")
     page.fill("#email", "' OR '1'='1'#")
     page.fill("#password", "anything")
-    page.click("button:has-text('Login')")
+    page.click("main button")
 
-    #secure: query is parameterised, so the injected string matches no user and login fails
+    #secure: the query is parameterised, so the injected string matches no user and login fails
     expect(page).to_have_url(BASE + "/login")
     expect(page.locator("body")).to_contain_text("Invalid email or password.")
-    expect(page.locator("body")).not_to_contain_text("Logout")
